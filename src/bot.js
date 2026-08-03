@@ -33,6 +33,7 @@ try {
 }
 
 let cards = [];
+let loadError = null;
 
 function mapOnlineCard(c) {
   const domains = c.classification?.domain || [];
@@ -90,6 +91,7 @@ async function loadCards() {
     console.log(`✅ Loaded ${cards.length} cards dynamically from Riftcodex API!`);
   } catch (error) {
     console.error('⚠️ Failed to load online cards, using local fallback:', error.message);
+    loadError = error.message;
     cards = fallbackCards;
   }
 }
@@ -98,6 +100,15 @@ async function loadCards() {
 await loadCards();
 
 // API Endpoints for Mini App
+app.get('/api/debug', (req, res) => {
+  res.json({
+    cardsCount: cards.length,
+    loadError: loadError,
+    nodeEnv: process.env.NODE_ENV,
+    url: process.env.WEB_APP_URL
+  });
+});
+
 app.get('/api/cards', (req, res) => {
   res.json(cards);
 });
@@ -234,6 +245,11 @@ if (!token || token === 'YOUR_BOT_TOKEN_HERE') {
 } else {
   try {
     bot = new Telegraf(token);
+
+    // Global bot error handler (prevents crashes on Telegram API drops)
+    bot.catch((err, ctx) => {
+      console.error('⚠️ Telegram Bot error occurred:', err.message || err);
+    });
 
     // Command: Start
     bot.start((ctx) => {
