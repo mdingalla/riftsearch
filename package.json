@@ -1,0 +1,21 @@
+{
+  "name": "riftbound-telegram-cards",
+  "version": "1.0.0",
+  "description": "Riftbound League of Legends TCG card search bot and Telegram Mini App",
+  "main": "src/bot.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/bot.js",
+    "dev": "node src/bot.js",
+    "test": "node test_search.js",
+    "tunnel": "ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -R 80:localhost:3000 nokey@localhost.run",
+    "kill-port": "npx kill-port 3000"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "localtunnel": "^2.0.2",
+    "telegraf": "^4.16.3"
+  }
+}

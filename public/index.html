@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Riftbound Card Explorer</title>
+  <!-- Telegram Web App SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-logo-container">
+        <div class="header-glow-logo"></div>
+        <h1 class="app-title">RIFTBOUND</h1>
+        <p class="app-subtitle">DATABASE EXPLORER</p>
+      </div>
+      <div class="stats-badge" id="statsBadge">
+        <span class="pulse-dot"></span>
+        <span id="cardCount">0 Cards</span>
+      </div>
+    </header>
+
+    <!-- Filter & Search Controls -->
+    <section class="controls-panel">
+      <!-- Search input -->
+      <div class="search-box">
+        <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="searchInput" placeholder="Search cards, abilities, types..." autocomplete="off">
+        <button id="clearSearch" class="clear-btn" style="display: none;">&times;</button>
+      </div>
+
+      <!-- Domain Selector Pills -->
+      <div class="domain-filters-container">
+        <span class="filter-label">Domains</span>
+        <div class="domain-pills" id="domainPills">
+          <button class="domain-pill active" data-domain="All">All</button>
+          <button class="domain-pill" data-domain="Fury" data-color="fury">🔴 Fury</button>
+          <button class="domain-pill" data-domain="Calm" data-color="calm">🟢 Calm</button>
+          <button class="domain-pill" data-domain="Mind" data-color="mind">🔵 Mind</button>
+          <button class="domain-pill" data-domain="Body" data-color="body">🟠 Body</button>
+          <button class="domain-pill" data-domain="Chaos" data-color="chaos">🟣 Chaos</button>
+          <button class="domain-pill" data-domain="Order" data-color="order">🟡 Order</button>
+        </div>
+      </div>
+
+      <!-- Dropdown Selectors Group -->
+      <div class="dropdown-filters">
+        <!-- Type Filter -->
+        <div class="select-wrapper">
+          <select id="typeFilter">
+            <option value="All">All Types</option>
+            <option value="Champion Legend">Champion Legend</option>
+            <option value="Unit">Unit</option>
+            <option value="Spell">Spell</option>
+            <option value="Gear">Gear</option>
+            <option value="Battlefield">Battlefield</option>
+          </select>
+        </div>
+
+        <!-- Rarity Filter -->
+        <div class="select-wrapper">
+          <select id="rarityFilter">
+            <option value="All">All Rarities</option>
+            <option value="Common">Common</option>
+            <option value="Rare">Rare</option>
+            <option value="Epic">Epic</option>
+            <option value="Legendary">Legendary</option>
+          </select>
+        </div>
+
+        <!-- Reset Button -->
+        <button id="resetFilters" class="reset-btn">Reset</button>
+      </div>
+    </section>
+
+    <!-- Main Grid Content -->
+    <main class="grid-section">
+      <!-- Cards Grid -->
+      <div class="cards-grid" id="cardsGrid">
+        <!-- Dynamic card elements go here -->
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-state" id="loadingState">
+        <div class="spinner"></div>
+        <p>Tuning the Rift...</p>
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="emptyState" style="display: none;">
+        <svg class="empty-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <h3>No Cards Match Your Filters</h3>
+        <p>Try clearing your search or resetting domain filters to find cards.</p>
+        <button id="emptyResetBtn" class="primary-btn">Reset All Filters</button>
+      </div>
+    </main>
+
+    <!-- Footer Meta -->
+    <footer class="app-footer">
+      <p>Riftbound TCG is © Riot Games. This is an unofficial fan app.</p>
+    </footer>
+  </div>
+
+  <!-- Card Details Modal Overlay -->
+  <div class="modal-overlay" id="cardModal">
+    <div class="modal-content">
+      <button class="modal-close" id="modalClose">&times;</button>
+      
+      <div class="modal-body" id="modalBody">
+        <!-- Dynamic modal content goes here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Main JavaScript -->
+  <script src="app.js"></script>
+</body>
+</html>
