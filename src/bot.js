@@ -165,10 +165,15 @@ function formatCardDetails(c) {
 async function sendCardReply(ctx, card) {
   const webAppUrl = process.env.WEB_APP_URL;
   const isHttps = webAppUrl && webAppUrl.startsWith('https://');
+  const isPrivate = ctx.chat?.type === 'private';
 
   const row = [Markup.button.callback('💰 Live Prices', `tcgprice:${card.name}`)];
   if (isHttps) {
-    row.push(Markup.button.webApp('🌐 Card Explorer', webAppUrl));
+    if (isPrivate) {
+      row.push(Markup.button.webApp('🌐 Card Explorer', webAppUrl));
+    } else {
+      row.push(Markup.button.url('🌐 Card Explorer', webAppUrl));
+    }
   }
   const keyboard = Markup.inlineKeyboard([row]);
 
@@ -386,11 +391,13 @@ if (!token || token === 'YOUR_BOT_TOKEN_HERE') {
       // Mini App Button configuration
       const webAppUrl = process.env.WEB_APP_URL;
       const isHttps = webAppUrl && webAppUrl.startsWith('https://');
+      const isPrivate = ctx.chat?.type === 'private';
 
       if (isHttps) {
-        return ctx.replyWithHTML(welcome, Markup.inlineKeyboard([
-          [Markup.button.webApp('🌐 Open Card Explorer', webAppUrl)]
-        ]));
+        const button = isPrivate
+          ? Markup.button.webApp('🌐 Open Card Explorer', webAppUrl)
+          : Markup.button.url('🌐 Open Card Explorer', webAppUrl);
+        return ctx.replyWithHTML(welcome, Markup.inlineKeyboard([[button]]));
       } else {
         const warningWelcome = welcome + `\n\n⚠️ <i>Note: The interactive Mini App button is hidden because WEB_APP_URL is not configured with a secure HTTPS link in the server's .env file.</i>`;
         return ctx.replyWithHTML(warningWelcome);
