@@ -5,6 +5,16 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Telegraf, Markup } from 'telegraf';
+import {
+  searchTCGCards,
+  getCardDetails,
+  getBuyOrders,
+  getSellListings,
+  getSalesHistory,
+  getImageUrl,
+  fmtPrice,
+  fmtCondition
+} from './tcgMarketplace.js';
 
 // Load environment variables
 dotenv.config();
@@ -153,6 +163,13 @@ function formatCardDetails(c) {
 
 // Helper: Sends a card response, using photo if available online, otherwise falls back to text
 async function sendCardReply(ctx, card) {
+  const keyboard = Markup.inlineKeyboard([
+    [
+      Markup.button.callback('💰 Live Prices', `tcgprice:${card.name}`),
+      Markup.button.webApp('🌐 Card Explorer', process.env.WEB_APP_URL || '')
+    ]
+  ]);
+
   if (card.image && card.image.startsWith('http')) {
     try {
       const caption = `<b>🃏 ${card.name} (${card.id})</b>\n` +
@@ -164,7 +181,8 @@ async function sendCardReply(ctx, card) {
       await ctx.replyWithPhoto(card.image, {
         caption: caption.substring(0, 1024),
         parse_mode: 'HTML',
-        reply_to_message_id: ctx.message?.message_id
+        reply_to_message_id: ctx.message?.message_id,
+        ...(process.env.WEB_APP_URL ? keyboard : Markup.inlineKeyboard([[Markup.button.callback('💰 Live Prices', `tcgprice:${card.name}`)]]))
       });
       return;
     } catch (err) {
@@ -174,7 +192,8 @@ async function sendCardReply(ctx, card) {
   // Fallback to text message
   try {
     await ctx.replyWithHTML(formatCardDetails(card), {
-      reply_to_message_id: ctx.message?.message_id
+      reply_to_message_id: ctx.message?.message_id,
+      ...(process.env.WEB_APP_URL ? keyboard : Markup.inlineKeyboard([[Markup.button.callback('💰 Live Prices', `tcgprice:${card.name}`)]]))
     });
   } catch (err) {
     console.error(`⚠️ Failed to send fallback HTML details for card ${card.id}:`, err.message);
@@ -232,6 +251,106 @@ function findCardsByQuery(query, cardsList) {
   if (idMatch.length > 0) return idMatch;
 
   return [];
+}
+
+// Helper: Fetches and formats TCG Marketplace price info for a card name
+async function sendTCGPriceReply(ctx, cardName, replyToId = null) {
+  const thinking = await ctx.replyWithHTML(`🔍 Looking up prices for <b>${cardName}</b> on TCG Marketplace...`);
+  try {
+    const { merged, listingIds } = await searchTCGCards(cardName);
+    if (!merged.length) {
+      return ctx.telegram.editMessageText(
+        ctx.chat.id, thinking.message_id, null,
+        `❌ No Riftbound cards found for "<b>${cardName}</b>" on TCG Marketplace.`,
+        { parse_mode: 'HTML' }
+      );
+    }
+
+    const card = merged[0];
+    const [details, sellListings, buyOrders, sales] = await Promise.all([
+      getCardDetails(card.id),
+      getSellListings(card.id).catch(() => []),
+      getBuyOrders(card.id).catch(() => []),
+      getSalesHistory(card.id).catch(() => [])
+    ]);
+
+    const name = (details?.name || card.name || '').trim();
+    const setName = details?.crd_setname || card.setname || '';
+    const rarity = details?.crd_rarity || '';
+    const imgUrl = getImageUrl(details?.image || card.image || '');
+
+    let msg = `💰 <b>TCG Marketplace – ${name}</b>\n`;
+    msg += `<i>${setName}  |  ${rarity}</i>\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
+
+    // Price summary
+    if (details?.price_from || details?.day1 || details?.day7) {
+      msg += `📊 <b>Price Averages:</b>\n`;
+      if (details.price_from) msg += `  Lowest listed:   <b>${fmtPrice(details.price_from)}</b>\n`;
+      if (details.day1)       msg += `  1-day avg sold:  <b>${fmtPrice(details.day1)}</b>\n`;
+      if (details.day7)       msg += `  7-day avg sold:  <b>${fmtPrice(details.day7)}</b>\n`;
+      msg += `\n`;
+    }
+
+    // Active sell listings
+    if (!sellListings.length) {
+      msg += `🛍 <b>Sell Listings:</b> None active\n`;
+    } else {
+      const prices = sellListings.map(l => parseFloat(l.price)).filter(Boolean).sort((a,b) => a-b);
+      msg += `🛍 <b>Active Listings: ${sellListings.length}</b>  (${fmtPrice(prices[0])} – ${fmtPrice(prices[prices.length-1])})\n`;
+      sellListings.slice(0, 4).forEach(l => {
+        const foil = l.crd_foil && l.crd_foil !== 'Non Holo' && l.crd_foil !== '0' && l.crd_foil !== 0 ? ` [Foil]` : '';
+        const lang = l.crd_language !== 'EN' ? ` (${l.crd_language})` : '';
+        const alterSign = (l.crd_signed ? ' [Signed]' : '') + (l.crd_altered ? ' [Altered]' : '');
+        msg += `  • <b>${fmtPrice(l.price)}</b>  ${fmtCondition(l.crd_condition)}${foil}${lang}${alterSign}  qty:${l.quantity}  [${l.country_code}]\n`;
+      });
+    }
+
+    // Active WTB buy orders
+    if (buyOrders.length) {
+      const prices = buyOrders.map(l => parseFloat(l.price)).filter(Boolean).sort((a,b) => a-b);
+      msg += `\n📥 <b>Active Buy Orders (WTB): ${buyOrders.length}</b>  (${fmtPrice(prices[0])} – ${fmtPrice(prices[prices.length-1])})\n`;
+      buyOrders.slice(0, 4).forEach(l => {
+        const foil = l.crd_foil && l.crd_foil !== 'Non Holo' && l.crd_foil !== '0' && l.crd_foil !== 0 ? ` [Foil]` : '';
+        const lang = l.crd_language !== 'EN' ? ` (${l.crd_language})` : '';
+        msg += `  • <b>${fmtPrice(l.price)}</b>  ${fmtCondition(l.crd_condition)}${foil}${lang}  qty:${l.quantity}  [${l.country_code}]\n`;
+      });
+    }
+
+    // Recent sales
+    if (sales.length) {
+      msg += `\n📈 <b>Recent Sales:</b>\n`;
+      sales.slice(0, 4).forEach(s => {
+        const foil = s.crd_foil && s.crd_foil !== 'Non Holo' && s.crd_foil !== '0' && s.crd_foil !== 0 ? ` [Foil]` : '';
+        msg += `  • ${s.date}  <b>${fmtPrice(s.avg_price)}</b>  ${fmtCondition(s.crd_condition)}  qty:${s.total_sold}${foil}\n`;
+      });
+    }
+
+    msg += `\n<i>Card ID: ${card.id} | Data from thetcgmarketplace.com</i>`;
+
+    await ctx.telegram.deleteMessage(ctx.chat.id, thinking.message_id).catch(() => {});
+
+    if (imgUrl) {
+      try {
+        return await ctx.replyWithPhoto(imgUrl, {
+          caption: msg.substring(0, 1024),
+          parse_mode: 'HTML',
+          reply_to_message_id: replyToId || ctx.message?.message_id
+        });
+      } catch (photoErr) {
+        console.warn('⚠️ Price photo failed, falling back to text:', photoErr.message);
+      }
+    }
+    return ctx.replyWithHTML(msg, { reply_to_message_id: replyToId || ctx.message?.message_id });
+
+  } catch (err) {
+    console.error('❌ TCG Price Lookup error:', err.message);
+    return ctx.telegram.editMessageText(
+      ctx.chat.id, thinking.message_id, null,
+      `❌ Failed to fetch prices: ${err.message}`,
+      { parse_mode: 'HTML' }
+    ).catch(() => ctx.replyWithHTML(`❌ Failed to fetch prices: ${err.message}`));
+  }
 }
 
 // Setup Telegram Bot
@@ -330,6 +449,27 @@ if (!token || token === 'YOUR_BOT_TOKEN_HERE') {
       return ctx.replyWithHTML(response, Markup.inlineKeyboard(buttons));
     });
 
+    // Command: Price – live TCG Marketplace lookup
+    bot.command('price', async (ctx) => {
+      const query = ctx.payload ? ctx.payload.trim() : '';
+      if (!query) {
+        return ctx.replyWithHTML(
+          '💰 <b>Usage:</b> <code>/price &lt;card name&gt;</code>\n\n' +
+          'Examples:\n' +
+          '• <code>/price Sona</code>\n' +
+          '• <code>/price Public Execution</code>'
+        );
+      }
+      await sendTCGPriceReply(ctx, query);
+    });
+
+    // Handle Live Price callback query
+    bot.action(/^tcgprice:(.+)$/, async (ctx) => {
+      const cardName = ctx.match[1];
+      ctx.answerCbQuery().catch(() => {});
+      await sendTCGPriceReply(ctx, cardName);
+    });
+
     // Handle Callback Queries (when card buttons are clicked)
     bot.action(/^card:(.+)$/, async (ctx) => {
       const cardId = ctx.match[1];
@@ -396,14 +536,32 @@ if (!token || token === 'YOUR_BOT_TOKEN_HERE') {
       // 2. Check for prefixed double brackets syntax: [[rb:Card Name]] or [[rb Card Name]]
       const prefixedBracketRegex = /\[\[rb:?(.*?)\]\]/gi;
       while ((match = prefixedBracketRegex.exec(text)) !== null) {
+        const inner = match[1].trim();
+        if (inner.toLowerCase().startsWith('price ') || inner.toLowerCase().startsWith('price:')) {
+          const priceQuery = inner.replace(/^price:?\s*/i, '').trim();
+          if (priceQuery) queries.push('__price__:' + priceQuery);
+        } else if (inner) {
+          queries.push(inner.toLowerCase());
+        }
+      }
+
+      // 3. Check for dedicated price bracket syntax: [[price:Card Name]]
+      const priceBracketRegex = /\[\[price:(.*?)\]\]/gi;
+      while ((match = priceBracketRegex.exec(text)) !== null) {
         if (match[1].trim()) {
-          queries.push(match[1].trim().toLowerCase());
+          queries.push('__price__:' + match[1].trim().toLowerCase());
         }
       }
 
       // 1. Handle Custom Braces / Prefixed bracket queries (works in groups and DMs)
       if (queries.length > 0) {
         for (const query of queries) {
+          if (query.startsWith('__price__:')) {
+            const priceQuery = query.slice('__price__:'.length);
+            await sendTCGPriceReply(ctx, priceQuery, ctx.message?.message_id);
+            continue;
+          }
+
           const matchedCards = findCardsByQuery(query, cards);
           
           if (matchedCards.length === 0) {
