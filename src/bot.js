@@ -163,12 +163,14 @@ function formatCardDetails(c) {
 
 // Helper: Sends a card response, using photo if available online, otherwise falls back to text
 async function sendCardReply(ctx, card) {
-  const keyboard = Markup.inlineKeyboard([
-    [
-      Markup.button.callback('💰 Live Prices', `tcgprice:${card.name}`),
-      Markup.button.webApp('🌐 Card Explorer', process.env.WEB_APP_URL || '')
-    ]
-  ]);
+  const webAppUrl = process.env.WEB_APP_URL;
+  const isHttps = webAppUrl && webAppUrl.startsWith('https://');
+
+  const row = [Markup.button.callback('💰 Live Prices', `tcgprice:${card.name}`)];
+  if (isHttps) {
+    row.push(Markup.button.webApp('🌐 Card Explorer', webAppUrl));
+  }
+  const keyboard = Markup.inlineKeyboard([row]);
 
   if (card.image && card.image.startsWith('http')) {
     try {
@@ -182,7 +184,7 @@ async function sendCardReply(ctx, card) {
         caption: caption.substring(0, 1024),
         parse_mode: 'HTML',
         reply_to_message_id: ctx.message?.message_id,
-        ...(process.env.WEB_APP_URL ? keyboard : Markup.inlineKeyboard([[Markup.button.callback('💰 Live Prices', `tcgprice:${card.name}`)]]))
+        ...keyboard
       });
       return;
     } catch (err) {
@@ -193,7 +195,7 @@ async function sendCardReply(ctx, card) {
   try {
     await ctx.replyWithHTML(formatCardDetails(card), {
       reply_to_message_id: ctx.message?.message_id,
-      ...(process.env.WEB_APP_URL ? keyboard : Markup.inlineKeyboard([[Markup.button.callback('💰 Live Prices', `tcgprice:${card.name}`)]]))
+      ...keyboard
     });
   } catch (err) {
     console.error(`⚠️ Failed to send fallback HTML details for card ${card.id}:`, err.message);
@@ -608,12 +610,13 @@ if (!token || token === 'YOUR_BOT_TOKEN_HERE') {
       );
 
       if (results.length === 0) {
+        const webAppUrl = process.env.WEB_APP_URL;
+        const isHttps = webAppUrl && webAppUrl.startsWith('https://');
+        
         return ctx.replyWithHTML(
           `🔍 No cards found matching "<b>${ctx.message.text}</b>".\n\n` +
-          `Try searching for champions like <i>Jinx</i> or <i>Yasuo</i>, or click below to browse the database:`,
-          Markup.inlineKeyboard([
-            [Markup.button.webApp('🌐 Open Card Explorer', process.env.WEB_APP_URL)]
-          ])
+          `Try searching for champions like <i>Jinx</i> or <i>Yasuo</i>.`,
+          isHttps ? Markup.inlineKeyboard([[Markup.button.webApp('🌐 Open Card Explorer', webAppUrl)]]) : undefined
         );
       }
 
