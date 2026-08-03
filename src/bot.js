@@ -535,23 +535,20 @@ if (!token || token === 'YOUR_BOT_TOKEN_HERE') {
         }
       }
 
-      // 2. Check for prefixed double brackets syntax: [[rb:Card Name]] or [[rb Card Name]]
-      const prefixedBracketRegex = /\[\[rb:?(.*?)\]\]/gi;
-      while ((match = prefixedBracketRegex.exec(text)) !== null) {
+      // 2. Check for double brackets syntax: [[Card Name]], [[rb:Card Name]], or [[price:Card Name]]
+      const bracketRegex = /\[\[(.*?)\]\]/g;
+      while ((match = bracketRegex.exec(text)) !== null) {
         const inner = match[1].trim();
-        if (inner.toLowerCase().startsWith('price ') || inner.toLowerCase().startsWith('price:')) {
+        if (!inner) continue;
+
+        if (inner.toLowerCase().startsWith('price:') || inner.toLowerCase().startsWith('price ')) {
           const priceQuery = inner.replace(/^price:?\s*/i, '').trim();
           if (priceQuery) queries.push('__price__:' + priceQuery);
-        } else if (inner) {
+        } else if (inner.toLowerCase().startsWith('rb:') || inner.toLowerCase().startsWith('rb ')) {
+          const cardQuery = inner.replace(/^rb:?\s*/i, '').trim();
+          if (cardQuery) queries.push(cardQuery.toLowerCase());
+        } else {
           queries.push(inner.toLowerCase());
-        }
-      }
-
-      // 3. Check for dedicated price bracket syntax: [[price:Card Name]]
-      const priceBracketRegex = /\[\[price:(.*?)\]\]/gi;
-      while ((match = priceBracketRegex.exec(text)) !== null) {
-        if (match[1].trim()) {
-          queries.push('__price__:' + match[1].trim().toLowerCase());
         }
       }
 
