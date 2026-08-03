@@ -309,7 +309,9 @@ async function sendTCGPriceReply(ctx, cardName, replyToId = null) {
         const foil = l.crd_foil && l.crd_foil !== 'Non Holo' && l.crd_foil !== '0' && l.crd_foil !== 0 ? ` [Foil]` : '';
         const lang = l.crd_language !== 'EN' ? ` (${l.crd_language})` : '';
         const alterSign = (l.crd_signed ? ' [Signed]' : '') + (l.crd_altered ? ' [Altered]' : '');
-        msg += `  • <b>${fmtPrice(l.price)}</b>  ${fmtCondition(l.crd_condition)}${foil}${lang}${alterSign}  qty:${l.quantity}  [${l.country_code}]\n`;
+        const sellerName = l.merchant_name || 'Seller';
+        const salesCount = l.sales || 0;
+        msg += `  • <b>${fmtPrice(l.price)}</b>  ${fmtCondition(l.crd_condition)}${foil}${lang}${alterSign}  qty:${l.quantity}  by <i>${sellerName}</i> (${salesCount} sales)  [${l.country_code}]\n`;
       });
     }
 
@@ -320,7 +322,9 @@ async function sendTCGPriceReply(ctx, cardName, replyToId = null) {
       buyOrders.slice(0, 4).forEach(l => {
         const foil = l.crd_foil && l.crd_foil !== 'Non Holo' && l.crd_foil !== '0' && l.crd_foil !== 0 ? ` [Foil]` : '';
         const lang = l.crd_language !== 'EN' ? ` (${l.crd_language})` : '';
-        msg += `  • <b>${fmtPrice(l.price)}</b>  ${fmtCondition(l.crd_condition)}${foil}${lang}  qty:${l.quantity}  [${l.country_code}]\n`;
+        const buyerName = l.buyer_name || '*****';
+        const boughtCount = l.total_bought || 0;
+        msg += `  • <b>${fmtPrice(l.price)}</b>  ${fmtCondition(l.crd_condition)}${foil}${lang}  qty:${l.quantity}  by <i>${buyerName}</i> (${boughtCount} bought)  [${l.country_code}]\n`;
       });
     }
 
